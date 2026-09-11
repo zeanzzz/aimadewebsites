@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A Year in the Life - Bubbly 2D Watercolor Scrollytelling</title>
+  
+  <!-- GSAP & ScrollTrigger CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+  <!-- Google Fonts: Fredoka (Rounded Bubbly Webtoon / Manhua Style) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Fredoka', cursive, sans-serif;
+      background-color: #0b0e14;
+      color: #1a1a1a;
+      overflow-x: hidden;
+    }
+
+    /* Fixed Viewport Container */
+    .viewport {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    /* Scroll Track Height (1200vh for 5s scrolling per season) */
+    .scroll-track {
+      height: 1200vh;
+      position: relative;
+      z-index: 0;
+    }
+
+    /* Stage Canvas Layers */
+    .season-stage {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .season-stage.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #stage-spring { background: linear-gradient(180deg, #e0f2fe 0%, #f0fdf4 100%); }
+    #stage-summer { background: linear-gradient(180deg, #ccfbf1 0%, #e0f2fe 100%); }
+    #stage-autumn { background: linear-gradient(180deg, #ffedd5 0%, #fed7aa 100%); }
+    #stage-winter { background: linear-gradient(180deg, #1e1b4b 0%, #312e81 100%); }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Watercolor Paper Overlay */
+    .paper-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0.22;
+      z-index: 8;
+      background-image: radial-gradient(#000 0.75px, transparent 0.75px), radial-gradient(#000 0.75px, #fdfbf7 0.75px);
+      background-size: 30px 30px;
+      background-position: 0 0, 15px 15px;
+      mix-blend-mode: multiply;
+    }
+
+    /* Bubbly Story Box Overlay */
+    .story-card {
+      position: absolute;
+      top: 5%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 253, 247, 0.94);
+      padding: 16px 32px;
+      border-radius: 25px;
+      border: 4px solid #2d2319;
+      box-shadow: 6px 6px 0px #2d2319;
+      text-align: center;
+      max-width: 650px;
+      z-index: 10;
+    }
+
+    .story-card h2 {
+      font-size: 2.3rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .story-card p {
+      font-size: 1.25rem;
+      font-weight: 600;
+      line-height: 1.3;
+      color: #332619;
+    }
+
+    /* HUD Dots */
+    .hud {
+      position: fixed;
+      bottom: 25px;
+      right: 30px;
+      z-index: 20;
+      display: flex;
+      gap: 12px;
+      background: rgba(255,255,255,0.9);
+      padding: 10px 20px;
+      border-radius: 30px;
+      border: 3px solid #2d2319;
+      box-shadow: 3px 3px 0px #2d2319;
+    }
+
+    .dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #c2b6a7;
+      border: 2px solid #2d2319;
+      transition: all 0.3s ease;
+    }
+
+    .dot.active {
+      background: #f59e0b;
+      transform: scale(1.3);
+    }
+
+    /* Transition Layer Elements */
+    .transition-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 15;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="viewport">
+    <div class="paper-overlay"></div>
+
+    <!-- HUD -->
+    <div class="hud">
+      <div class="dot active" id="dot-0"></div>
+      <div class="dot" id="dot-1"></div>
+      <div class="dot" id="dot-2"></div>
+      <div class="dot" id="dot-3"></div>
+    </div>
+
+    <!-- Transition Canvas Layers -->
+    <canvas id="trans-canvas" class="transition-canvas"></canvas>
+
+    <!-- STAGES -->
+    <div class="season-stage active" id="stage-spring">
+      <canvas id="canvas-spring"></canvas>
+      <div class="story-card">
+        <h2 style="color: #db2777;">CHAPTER I: THE THAW</h2>
+        <p>Snow softens under gentle spring rays. A tail wags in cold mist... springtime awakens!</p>
+      </div>
+    </div>
+
+    <div class="season-stage" id="stage-summer">
+      <canvas id="canvas-summer"></canvas>
+      <div class="story-card">
+        <h2 style="color: #0d9488;">CHAPTER II: MIDSUMMER RUN</h2>
+        <p>Sunlight dapples the riverbank. Paws splash through cool, turquoise streams!</p>
+      </div>
+    </div>
+
+    <div class="season-stage" id="stage-autumn">
+      <canvas id="canvas-autumn"></canvas>
+      <div class="story-card">
+        <h2 style="color: #ea580c;">CHAPTER III: GOLDEN GUSTS</h2>
+        <p>Crisp winds swirl golden foliage. A playful leap into rustling piles of leaves!</p>
+      </div>
+    </div>
+
+    <div class="season-stage" id="stage-winter">
+      <canvas id="canvas-winter"></canvas>
+      <div class="story-card" style="background: rgba(30, 27, 75, 0.92); border-color: #e0e7ff; box-shadow: 6px 6px 0px #818cf8;">
+        <h2 style="color: #a5f3fc;">CHAPTER IV: SILENT FOOTPRINTS</h2>
+        <p style="color: #e0e7ff;">Soft snow blankets the forest floor. A faithful journey leaves warm memories in the frost.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="scroll-track"></div>
+
+  <script>
+    gsap.registerPlugin(ScrollTrigger);
+
+    const stages = ['spring', 'summer', 'autumn', 'winter'];
+    const canvases = {};
+    const ctxs = {};
+
+    stages.forEach(s => {
+      canvases[s] = document.getElementById(`canvas-${s}`);
+      ctxs[s] = canvases[s].getContext('2d');
+    });
+
+    const transCanvas = document.getElementById('trans-canvas');
+    const transCtx = transCanvas.getContext('2d');
+
+    function resize() {
+      stages.forEach(s => {
+        canvases[s].width = window.innerWidth;
+        canvases[s].height = window.innerHeight;
+      });
+      transCanvas.width = window.innerWidth;
+      transCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    const state = {
+      spring: { progress: 0 },
+      summer: { progress: 0 },
+      autumn: { progress: 0 },
+      winter: { progress: 0 },
+      transition: { type: 'none', progress: 0 }
+    };
+
+    // Environmental Particle Seeds
+    const petals = Array.from({ length: 40 }, (_, i) => ({
+      baseX: (i * 97) % 1920,
+      baseY: (i * 53) % 1080,
+      r: Math.random() * 5 + 3,
+      speedX: Math.random() * 800 + 400,
+      speedY: Math.random() * 400 + 200
+    }));
+
+    const leaves = Array.from({ length: 60 }, (_, i) => ({
+      baseX: (i * 113) % 1920,
+      baseY: (i * 67) % 1080,
+      size: Math.random() * 12 + 8,
+      speedX: Math.random() * 1200 + 600,
+      speedY: Math.random() * 500 + 300,
+      rotSpeed: Math.random() * 10 + 5
+    }));
+
+    const snowflakes = Array.from({ length: 110 }, (_, i) => ({
+      baseX: (i * 71) % 1920,
+      baseY: (i * 41) % 1080,
+      r: Math.random() * 3 + 1.5,
+      speedY: Math.random() * 900 + 400
+    }));
+
+    // Watercolor Soft Blob Drawing
+    function drawWatercolorBlob(ctx, x, y, radius, color, bleedScale = 1.2) {
+      ctx.save();
+      const grad = ctx.createRadialGradient(x, y, radius * 0.2, x, y, radius * bleedScale);
+      grad.addColorStop(0, color);
+      grad.addColorStop(0.7, color);
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      for (let angle = 0; angle < Math.PI * 2; angle += 0.4) {
+        const offset = (Math.sin(angle * 5) * 0.15 + Math.cos(angle * 3) * 0.1) * radius;
+        const r = radius + offset;
+        const bx = x + Math.cos(angle) * r;
+        const by = y + Math.sin(angle) * r;
+        if (angle === 0) ctx.moveTo(bx, by);
+        else ctx.lineTo(bx, by);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Detailed Watercolor Tree Engine
+    function drawDetailedTree(ctx, x, groundY, type) {
+      ctx.save();
+      ctx.strokeStyle = '#2c1e11'; ctx.lineWidth = 3;
+
+      if (type === 'cherry') {
+        // Trunk & Branches
+        ctx.fillStyle = '#4a2810';
+        ctx.beginPath();
+        ctx.moveTo(x - 20, groundY);
+        ctx.quadraticCurveTo(x - 10, groundY - 120, x - 35, groundY - 200);
+        ctx.lineTo(x - 15, groundY - 200);
+        ctx.quadraticCurveTo(x + 5, groundY - 100, x + 20, groundY);
+        ctx.fill(); ctx.stroke();
+
+        // Branch Splits
+        ctx.beginPath(); ctx.moveTo(x - 10, groundY - 110); ctx.lineTo(x + 35, groundY - 170); ctx.stroke();
+
+        // Watercolor Pink Blossom Clusters
+        drawWatercolorBlob(ctx, x - 35, groundY - 220, 85, 'rgba(244, 114, 182, 0.85)', 1.3);
+        drawWatercolorBlob(ctx, x + 25, groundY - 190, 75, 'rgba(251, 113, 133, 0.8)', 1.3);
+        drawWatercolorBlob(ctx, x - 5, groundY - 250, 95, 'rgba(248, 187, 208, 0.9)', 1.4);
+
+      } else if (type === 'oak') {
+        // Gnarled Trunk
+        ctx.fillStyle = '#3a1d08';
+        ctx.beginPath();
+        ctx.moveTo(x - 30, groundY);
+        ctx.lineTo(x - 20, groundY - 220);
+        ctx.lineTo(x + 20, groundY - 220);
+        ctx.lineTo(x + 30, groundY);
+        ctx.fill(); ctx.stroke();
+
+        // Branches
+        ctx.beginPath(); ctx.moveTo(x - 15, groundY - 140); ctx.lineTo(x - 60, groundY - 190); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x + 15, groundY - 150); ctx.lineTo(x + 65, groundY - 200); ctx.stroke();
+
+        // Lush Summer Canopy Clusters
+        drawWatercolorBlob(ctx, x, groundY - 270, 110, 'rgba(22, 163, 74, 0.85)', 1.3);
+        drawWatercolorBlob(ctx, x - 55, groundY - 220, 85, 'rgba(34, 197, 94, 0.8)', 1.3);
+        drawWatercolorBlob(ctx, x + 60, groundY - 230, 85, 'rgba(21, 128, 61, 0.85)', 1.3);
+
+      } else if (type === 'autumn-oak') {
+        // Trunk with roots
+        ctx.fillStyle = '#2d1606';
+        ctx.beginPath();
+        ctx.moveTo(x - 35, groundY);
+        ctx.lineTo(x - 22, groundY - 230);
+        ctx.lineTo(x + 22, groundY - 230);
+        ctx.lineTo(x + 35, groundY);
+        ctx.fill(); ctx.stroke();
+
+        // Golden/Amber Autumn Canopy
+        drawWatercolorBlob(ctx, x, groundY - 270, 120, 'rgba(234, 88, 12, 0.85)', 1.3);
+        drawWatercolorBlob(ctx, x - 60, groundY - 210, 90, 'rgba(245, 158, 11, 0.85)', 1.3);
+        drawWatercolorBlob(ctx, x + 65, groundY - 220, 90, 'rgba(220, 38, 38, 0.8)', 1.3);
+
+      } else if (type === 'pine') {
+        // Evergreen Trunk
+        ctx.fillStyle = '#1c0d02';
+        ctx.fillRect(x - 12, groundY - 220, 24, 220); ctx.strokeRect(x - 12, groundY - 220, 24, 220);
+
+        // Pine Layers with Snow Tops
+        for (let i = 0; i < 3; i++) {
+          const py = groundY - 80 - (i * 60);
+          const pwidth = 110 - (i * 25);
+          ctx.fillStyle = '#064e3b';
+          ctx.beginPath(); ctx.moveTo(x - pwidth, py); ctx.lineTo(x, py - 70); ctx.lineTo(x + pwidth, py); ctx.fill(); ctx.stroke();
+          // Snow cap
+          ctx.fillStyle = '#e0f2fe';
+          ctx.beginPath(); ctx.moveTo(x - pwidth*0.7, py - 20); ctx.lineTo(x, py - 70); ctx.lineTo(x + pwidth*0.7, py - 20); ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+
+    // Realistic Anatomical Golden Retriever Rig
+    function drawGoldenRetriever(ctx, x, y, progress, isSleeping = false) {
+      ctx.save();
+      ctx.translate(x, y);
+
+      // Ground Shadow Wash
+      drawWatercolorBlob(ctx, 0, 15, 38, 'rgba(45, 35, 25, 0.2)', 1.5);
+
+      const colorGolden = '#e59e35';
+      const colorDarkFur = '#c87c18';
+      const colorInk = '#2c1e11';
+
+      if (isSleeping) {
+        // Sleep Curled Body
+        ctx.fillStyle = colorGolden;
+        ctx.beginPath(); ctx.ellipse(0, 0, 36, 22, 0.1, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = colorInk; ctx.lineWidth = 2.5; ctx.stroke();
+
+        // Sleeping Head
+        ctx.beginPath(); ctx.arc(22, 6, 16, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = colorDarkFur;
+        ctx.beginPath(); ctx.ellipse(14, 4, 11, 6, 0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        
+        // Closed Eye & Snout
+        ctx.fillStyle = colorInk;
+        ctx.beginPath(); ctx.arc(32, 8, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.font = '700 22px "Fredoka"';
+        ctx.fillText("Z z z...", -5, -28);
+      } else {
+        // Continuous Smooth Trot Cycle
+        const cycle = progress * 45;
+        const leg1 = Math.sin(cycle) * 16;
+        const leg2 = -Math.sin(cycle) * 16;
+        const bodyBounce = Math.abs(Math.sin(cycle * 2)) * 5;
+
+        ctx.translate(0, -bodyBounce);
+
+        // Back Legs (Shadowed)
+        ctx.fillStyle = colorDarkFur;
+        ctx.strokeStyle = colorInk; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.ellipse(-20 + leg2, 16, 6, 16, 0.1, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(18 + leg1, 16, 5, 16, -0.1, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+        // Main Torso Body
+        ctx.fillStyle = colorGolden;
+        ctx.beginPath(); ctx.ellipse(0, -2, 42, 24, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+        // Front Legs (Foreground)
+        ctx.beginPath(); ctx.ellipse(-12 + leg1, 18, 6, 16, -0.1, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(26 + leg2, 18, 6, 16, 0.1, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+        // Red Collar
+        ctx.fillStyle = '#dc2626';
+        ctx.fillRect(24, -18, 7, 14); ctx.strokeRect(24, -18, 7, 14);
+
+        // Head Base
+        ctx.fillStyle = colorGolden;
+        ctx.beginPath(); ctx.arc(36, -14, 18, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+        // Refined Dog Snout & Jaw
+        ctx.beginPath(); ctx.ellipse(48, -10, 11, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = colorInk;
+        ctx.beginPath(); ctx.arc(56, -12, 4, 0, Math.PI * 2); ctx.fill(); // Nose
+
+        // Flappy Ear
+        const earAngle = Math.sin(cycle) * 0.15;
+        ctx.save();
+        ctx.translate(28, -22); ctx.rotate(earAngle);
+        ctx.fillStyle = colorDarkFur;
+        ctx.beginPath(); ctx.ellipse(0, 8, 8, 16, -0.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.restore();
+
+        // Eye
+        ctx.fillStyle = colorInk;
+        ctx.beginPath(); ctx.arc(42, -18, 3.5, 0, Math.PI * 2); ctx.fill();
+
+        // Anatomical Natural Pink Tongue Curved Out
+        ctx.fillStyle = '#f43f5e';
+        ctx.beginPath();
+        ctx.moveTo(50, -6);
+        ctx.quadraticCurveTo(58, -4, 56, 4);
+        ctx.quadraticCurveTo(50, 6, 48, -2);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+
+        // Wagging Fluffy Tail
+        const tailAngle = Math.sin(cycle * 1.5) * 0.35 - 0.4;
+        ctx.save();
+        ctx.translate(-38, -10); ctx.rotate(tailAngle);
+        ctx.fillStyle = colorGolden;
+        ctx.beginPath(); ctx.ellipse(-15, 0, 18, 8, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.restore();
+    }
+
+    // ------------------------------------------------------------------
+    // SEASON RENDERS
+    // ------------------------------------------------------------------
+
+    // 1. SPRING
+    function drawSpring(p) {
+      const ctx = ctxs['spring'];
+      const w = canvases['spring'].width; const h = canvases['spring'].height;
+      ctx.clearRect(0, 0, w, h);
+
+      const groundY = h * 0.75;
+
+      // Layered Detailed Ground / Floor
+      drawWatercolorBlob(ctx, w*0.5, groundY + 90, w*0.65, 'rgba(74, 222, 128, 0.9)', 1.1);
+      ctx.fillStyle = '#15803d'; ctx.fillRect(0, groundY + 20, w, h - groundY);
+      ctx.strokeStyle = '#2c1e11'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, groundY + 20); ctx.lineTo(w, groundY + 20); ctx.stroke();
+
+      // Detailed Trees
+      drawDetailedTree(ctx, 120, groundY + 20, 'cherry');
+      drawDetailedTree(ctx, w - 160, groundY + 20, 'cherry');
+
+      // Shrinking Snow Patch
+      const snowAlpha = Math.max(0, 1 - p * 2);
+      if (snowAlpha > 0) {
+        drawWatercolorBlob(ctx, w * 0.45, groundY + 30, 180, `rgba(241, 245, 249, ${snowAlpha})`, 1.2);
+      }
+
+      // Wildflowers
+      const flowerCount = Math.floor(p * 40);
+      for (let i = 0; i < flowerCount; i++) {
+        const fx = (i * 83) % w;
+        const fy = groundY + 30 + ((i * 37) % (h - groundY - 40));
+        drawWatercolorBlob(ctx, fx, fy, 8, i % 2 === 0 ? '#f43f5e' : '#facc15', 1.4);
+      }
+
+      // SCROLL-BOUND PETALS
+      ctx.fillStyle = '#f472b6';
+      petals.forEach(pt => {
+        const px = (pt.baseX + p * pt.speedX) % w;
+        const py = (pt.baseY + p * pt.speedY) % h;
+        ctx.beginPath(); ctx.arc(px, py, pt.r, 0, Math.PI*2); ctx.fill();
+      });
+
+      // Dog
+      const dogX = w * 0.2 + (p * w * 0.45);
+      drawGoldenRetriever(ctx, dogX, groundY, p, p < 0.2);
+
+      // Bee
+      if (p > 0.2) {
+        const beeX = dogX + 60 + Math.sin(p * 30) * 20;
+        const beeY = groundY - 60 + Math.cos(p * 20) * 15;
+        ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.arc(beeX, beeY, 8, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#000'; ctx.fillRect(beeX - 3, beeY - 7, 6, 14);
+        ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.ellipse(beeX - 3, beeY - 10, 5, 8, -0.4, 0, Math.PI*2); ctx.fill();
+
+        if (p > 0.48 && p < 0.72) {
+          ctx.fillStyle = '#db2777'; ctx.font = '700 32px "Fredoka"';
+          ctx.fillText("ACHOO!!", dogX + 30, groundY - 65);
+        }
+      }
+    }
+
+    // 2. SUMMER
+    function drawSummer(p) {
+      const ctx = ctxs['summer'];
+      const w = canvases['summer'].width; const h = canvases['summer'].height;
+      ctx.clearRect(0, 0, w, h);
+
+      const groundY = h * 0.72;
+
+      // Meadow Terrain & River Floor
+      drawWatercolorBlob(ctx, w*0.5, groundY + 90, w*0.65, 'rgba(22, 163, 74, 0.9)', 1.1);
+      ctx.fillStyle = '#166534'; ctx.fillRect(0, groundY + 30, w, h - groundY);
+
+      // Running River Bank
+      drawWatercolorBlob(ctx, w*0.5, groundY + 120, w*0.6, 'rgba(14, 165, 233, 0.85)', 1.2);
+
+      // Oak Trees
+      drawDetailedTree(ctx, 150, groundY + 30, 'oak');
+      drawDetailedTree(ctx, w - 180, groundY + 30, 'oak');
+
+      // Dog
+      const dogX = w * 0.15 + (p * w * 0.7);
+      drawGoldenRetriever(ctx, dogX, groundY + 20, p, false);
+
+      // Dragonfly
+      const dfX = dogX + 80 + Math.sin(p * 25) * 25;
+      const dfY = groundY - 45;
+      ctx.fillStyle = '#06b6d4'; ctx.fillRect(dfX, dfY, 20, 4);
+
+      // Frog Leaping
+      const frogX = w * 0.65;
+      const frogJump = (p > 0.3 && p < 0.7) ? Math.sin((p - 0.3)/0.4 * Math.PI) * 70 : 0;
+      drawWatercolorBlob(ctx, frogX, groundY + 35 - frogJump, 12, '#16a34a', 1.3);
+
+      if (frogJump > 15) {
+        ctx.fillStyle = '#0d9488'; ctx.font = '700 28px "Fredoka"';
+        ctx.fillText("SPLASH!", frogX - 25, groundY + 75);
+      }
+    }
+
+    // 3. AUTUMN
+    function drawAutumn(p) {
+      const ctx = ctxs['autumn'];
+      const w = canvases['autumn'].width; const h = canvases['autumn'].height;
+      ctx.clearRect(0, 0, w, h);
+
+      const groundY = h * 0.75;
+
+      // Layered Autumn Ground
+      drawWatercolorBlob(ctx, w*0.5, groundY + 90, w*0.65, 'rgba(194, 65, 12, 0.9)', 1.1);
+      ctx.fillStyle = '#9a3412'; ctx.fillRect(0, groundY + 20, w, h - groundY);
+
+      // Autumn Trees
+      drawDetailedTree(ctx, 160, groundY + 20, 'autumn-oak');
+      drawDetailedTree(ctx, w - 200, groundY + 20, 'autumn-oak');
+
+      // SCROLL-BOUND SWIRLING FALLEN LEAVES
+      leaves.forEach((l, i) => {
+        const lx = (l.baseX + p * l.speedX) % w;
+        const ly = (l.baseY + p * l.speedY) % h;
+        ctx.save();
+        ctx.translate(lx, ly);
+        ctx.rotate(p * l.rotSpeed + i);
+        ctx.fillStyle = i % 2 === 0 ? '#f59e0b' : '#dc2626';
+        ctx.fillRect(-l.size/2, -l.size/2, l.size, l.size/2);
+        ctx.restore();
+      });
+
+      // Dog
+      const dogX = w * 0.2 + (p * w * 0.45);
+      drawGoldenRetriever(ctx, dogX, groundY, p, false);
+
+      if (p > 0.48 && p < 0.75) {
+        ctx.fillStyle = '#ea580c'; ctx.font = '700 32px "Fredoka"';
+        ctx.fillText("RUSTLE!", dogX - 20, groundY - 60);
+      }
+
+      // Squirrel
+      const sqY = Math.min(groundY - 20, p * groundY * 1.1);
+      drawWatercolorBlob(ctx, w * 0.76 - 15, sqY, 14, '#c2410c', 1.3);
+      ctx.fillStyle = '#ea580c'; ctx.beginPath(); ctx.ellipse(w * 0.76 - 2, sqY - 8, 10, 18, 0.5, 0, Math.PI*2); ctx.fill();
+    }
+
+    // 4. WINTER
+    function drawWinter(p) {
+      const ctx = ctxs['winter'];
+      const w = canvases['winter'].width; const h = canvases['winter'].height;
+      ctx.clearRect(0, 0, w, h);
+
+      const groundY = h * 0.75;
+
+      // Snow Blanket Ground / Floor
+      drawWatercolorBlob(ctx, w*0.5, groundY + 80, w*0.65, 'rgba(224, 242, 254, 0.95)', 1.1);
+      ctx.fillStyle = '#f1f5f9'; ctx.fillRect(0, groundY + 20, w, h - groundY);
+
+      // Moon
+      drawWatercolorBlob(ctx, w * 0.8, h * 0.22, 65, 'rgba(254, 240, 138, 0.6)', 1.6);
+
+      // Frosted Pine Trees
+      drawDetailedTree(ctx, 140, groundY + 20, 'pine');
+      drawDetailedTree(ctx, w - 170, groundY + 20, 'pine');
+
+      // SCROLL-BOUND SNOWFLAKES
+      ctx.fillStyle = '#ffffff';
+      snowflakes.forEach(s => {
+        const sx = s.baseX;
+        const sy = (s.baseY + p * s.speedY) % h;
+        ctx.beginPath(); ctx.arc(sx, sy, s.r, 0, Math.PI*2); ctx.fill();
+      });
+
+      // Footprint Trail
+      const steps = Math.floor(p * 22);
+      ctx.fillStyle = '#93c5fd';
+      for (let i = 0; i < steps; i++) {
+        const px = w * 0.15 + (i * 28);
+        const py = groundY + 25 + (i % 2 === 0 ? 5 : -5);
+        ctx.beginPath(); ctx.ellipse(px, py, 6, 3, 0, 0, Math.PI*2); ctx.fill();
+      }
+
+      // Dog
+      const dogX = w * 0.15 + (p * w * 0.5);
+      drawGoldenRetriever(ctx, dogX, groundY + 5, p, false);
+
+      // Owl
+      const owlX = w * 0.82; const owlY = groundY - 120;
+      drawWatercolorBlob(ctx, owlX, owlY, 18, '#f8fafc', 1.2);
+      if (Math.floor(p * 30) % 6 !== 0) {
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath(); ctx.arc(owlX - 6, owlY - 2, 4, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(owlX + 6, owlY - 2, 4, 0, Math.PI*2); ctx.fill();
+      }
+
+      if (p > 0.6) {
+        ctx.fillStyle = '#a5f3fc'; ctx.font = '700 26px "Fredoka"';
+        ctx.fillText("HOOT!", owlX - 20, owlY - 32);
+      }
+    }
+
+    // Dynamic Morphing Transitions
+    function drawTransitions() {
+      const w = transCanvas.width; const h = transCanvas.height;
+      transCtx.clearRect(0, 0, w, h);
+
+      const t = state.transition;
+      if (t.type === 'water') {
+        const waveY = h * (1 - t.progress);
+        transCtx.fillStyle = '#0288d1';
+        transCtx.beginPath();
+        transCtx.moveTo(0, waveY);
+        for (let x = 0; x <= w; x += 30) {
+          transCtx.lineTo(x, waveY + Math.sin(x * 0.02 + t.progress * 15) * 20);
+        }
+        transCtx.lineTo(w, h); transCtx.lineTo(0, h); transCtx.fill();
+      } else if (t.type === 'vortex') {
+        const radius = t.progress * Math.max(w, h) * 1.2;
+        transCtx.save();
+        transCtx.fillStyle = '#ea580c';
+        transCtx.beginPath(); transCtx.arc(w/2, h/2, radius, 0, Math.PI * 2); transCtx.fill();
+        transCtx.restore();
+      } else if (t.type === 'frost') {
+        transCtx.fillStyle = `rgba(224, 242, 254, ${t.progress})`;
+        transCtx.fillRect(0, 0, w, h);
+      }
+    }
+
+    // Main Animation Loop
+    function render() {
+      drawSpring(state.spring.progress);
+      drawSummer(state.summer.progress);
+      drawAutumn(state.autumn.progress);
+      drawWinter(state.winter.progress);
+      drawTransitions();
+      requestAnimationFrame(render);
+    }
+    render();
+
+    // GSAP ScrollTrigger Timelines
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: ".scroll-track",
+        start: "top top",
+        end: "bottom bottom",
+        scrub: 0.5,
+        onUpdate: (self) => {
+          const currentSeason = Math.min(3, Math.floor(self.progress * 4));
+          for (let i = 0; i < 4; i++) {
+            document.getElementById(`dot-${i}`).classList.toggle('active', i === currentSeason);
+          }
+        }
+      }
+    });
+
+    // 1. SPRING
+    tl.to("#stage-spring", { opacity: 1, duration: 0.1 })
+      .to(state.spring, { progress: 1, duration: 2.5, ease: "none" })
+      .to(state.transition, { type: 'water', progress: 1, duration: 0.8, ease: "power2.inOut" })
+      .to("#stage-spring", { opacity: 0, duration: 0.01 })
+      .to("#stage-summer", { opacity: 1, duration: 0.01 })
+      .to(state.transition, { progress: 0, duration: 0.8, ease: "power2.inOut", onComplete: () => state.transition.type = 'none' })
+
+    // 2. SUMMER
+      .to(state.summer, { progress: 1, duration: 2.5, ease: "none" })
+      .to(state.transition, { type: 'vortex', progress: 1, duration: 0.8, ease: "power2.inOut" })
+      .to("#stage-summer", { opacity: 0, duration: 0.01 })
+      .to("#stage-autumn", { opacity: 1, duration: 0.01 })
+      .to(state.transition, { progress: 0, duration: 0.8, ease: "power2.inOut", onComplete: () => state.transition.type = 'none' })
+
+    // 3. AUTUMN
+      .to(state.autumn, { progress: 1, duration: 2.5, ease: "none" })
+      .to(state.transition, { type: 'frost', progress: 1, duration: 0.6, ease: "power2.inOut" })
+      .to("#stage-autumn", { opacity: 0, duration: 0.01 })
+      .to("#stage-winter", { opacity: 1, duration: 0.01 })
+      .to(state.transition, { progress: 0, duration: 0.6, ease: "power2.inOut", onComplete: () => state.transition.type = 'none' })
+
+    // 4. WINTER
+      .to(state.winter, { progress: 1, duration: 2.5, ease: "none" });
+
+  </script>
+</body>
+</html>
