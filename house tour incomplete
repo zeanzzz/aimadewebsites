@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Villa Architectural Tour</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <!-- GSAP, ScrollTrigger & Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            overflow-y: scroll !important;
+            height: auto !important;
+            background: #090d14;
+        }
+
+        body {
+            background-color: #090d14;
+            color: #ffffff;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            min-height: 18000px;
+        }
+
+        .scroll-container {
+            height: 2000vh;
+            width: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        .viewport {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 2;
+            pointer-events: none;
+            background-color: #090d14;
+        }
+
+        #webgl-canvas {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+
+        .hud-header {
+            position: fixed;
+            top: 2rem;
+            left: 2.5rem;
+            right: 2.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .brand {
+            font-family: 'Cinzel', serif;
+            font-size: 0.95rem;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: #ffffff;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+        }
+
+        .telemetry {
+            font-size: 0.75rem;
+            letter-spacing: 0.15em;
+            font-family: monospace;
+            background: rgba(9, 13, 20, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #d1d5db;
+            padding: 0.6rem 1.2rem;
+            border-radius: 4px;
+        }
+
+        .debug-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #3b82f6, #60a5fa);
+            width: 0%;
+            z-index: 99;
+        }
+
+        .story-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 5;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            padding: 0 8vw;
+        }
+
+        .card {
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-left: 4px solid #3b82f6;
+            border-radius: 6px;
+            padding: 1.8rem 2.2rem;
+            max-width: 400px;
+            opacity: 0;
+            transform: translateY(20px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
+        }
+
+        .card-tag {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            margin-bottom: 0.5rem;
+            display: block;
+            color: #60a5fa;
+            font-weight: 600;
+        }
+
+        .card h2 {
+            font-family: 'Cinzel', serif;
+            font-size: 1.35rem;
+            margin-bottom: 0.6rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #ffffff;
+        }
+
+        .card p {
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #94a3b8;
+        }
+
+        .card-right {
+            justify-content: flex-end;
+        }
+
+        .card-center {
+            justify-content: center;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="debug-bar" id="debugBar"></div>
+    <div class="scroll-container" id="scrollTrack"></div>
+
+    <div class="viewport">
+        <canvas id="webgl-canvas"></canvas>
+    </div>
+
+    <header class="hud-header">
+        <div class="brand">LUXURY RESIDENCE // REALISTIC DRONE TOUR</div>
+        <div class="telemetry" id="telemetry">ZONE: EXTERIOR FACADE | ALT: 3.5M</div>
+    </header>
+
+    <!-- Overlay Cards -->
+    <div class="story-layer" id="layer-1"><div class="card"><span class="card-tag">EXTERIOR ARCHITECTURE</span><h2>VILLA FACADE</h2><p>Approaching the modern architectural residence with charcoal concrete framing, warm cedar paneling, and tinted window glazing.</p></div></div>
+    <div class="story-layer card-right" id="layer-2"><div class="card"><span class="card-tag">LEVEL 01 // ENTRYWAY</span><h2>ENTRANCE FOYER</h2><p>Gliding through the open glass pivot door into the ground floor entrance hallway.</p></div></div>
+    <div class="story-layer" id="layer-3"><div class="card"><span class="card-tag">LEVEL 01 // WEST WING</span><h2>EXECUTIVE GARAGE</h2><p>Navigating through the interior doorway into the private vehicle bay.</p></div></div>
+    <div class="story-layer card-right" id="layer-4"><div class="card"><span class="card-tag">LEVEL 01 // EAST WING</span><h2>GUEST SUITE</h2><p>Crossing the hall through the doorway threshold into the ground floor guest bedroom.</p></div></div>
+    
+    <div class="story-layer card-center" id="layer-5"><div class="card"><span class="card-tag">TRANSITION</span><h2>CENTRAL SPIRAL STAIR</h2><p>Hovering smoothly up the interior open stairwell shaft to the second story landing.</p></div></div>
+    
+    <div class="story-layer" id="layer-6"><div class="card"><span class="card-tag">LEVEL 02 // LIVING</span><h2>GREAT ROOM GALLERY</h2><p>Emerging into the double-height lounge area with a stone fireplace wall and leather sofa.</p></div></div>
+    <div class="story-layer card-right" id="layer-7"><div class="card"><span class="card-tag">LEVEL 02 // KITCHEN</span><h2>CULINARY SUITE</h2><p>Sweeping through the framed archway over the dark marble waterfall kitchen island.</p></div></div>
+    <div class="story-layer" id="layer-8"><div class="card"><span class="card-tag">LEVEL 02 // TERRACE</span><h2>CANTILEVER DECK</h2><p>Passing through open sliding glass doors out onto the cantilevered teak outdoor deck.</p></div></div>
+    
+    <div class="story-layer card-center" id="layer-9"><div class="card"><span class="card-tag">TRANSITION</span><h2>UPPER STAIRWELL</h2><p>Climbing the second stairwell flight through the floor opening to the master floor.</p></div></div>
+
+    <div class="story-layer card-right" id="layer-10"><div class="card"><span class="card-tag">LEVEL 03 // MASTER</span><h2>PRIMARY SANCTUARY</h2><p>Flying through the bedroom door into the top-floor master suite with deep indigo walls.</p></div></div>
+    <div class="story-layer" id="layer-11"><div class="card"><span class="card-tag">LEVEL 03 // ENSUITE</span><h2>SPA BATHROOM</h2><p>Crossing through the pocket doorway into the white marble primary bathroom suite.</p></div></div>
+    <div class="story-layer card-center" id="layer-12"><div class="card"><span class="card-tag">LEVEL 03 // SKYDECK</span><h2>ROOFTOP POOL DECK</h2><p>Exiting the glass door onto the rooftop terrace, featuring an azure infinity plunge pool under the open sky.</p></div></div>
+
+    <script>
+        window.addEventListener("DOMContentLoaded", () => {
+            gsap.registerPlugin(ScrollTrigger);
+
+            const canvas = document.getElementById("webgl-canvas");
+            const debugBar = document.getElementById("debugBar");
+
+            // --- THREE.JS SCENE SETUP ---
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x090d14);
+            scene.fog = new THREE.FogExp2(0x090d14, 0.008);
+
+            const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            // --- LIGHTING ---
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.DirectionalLight(0xfff5ea, 1.3);
+            sunLight.position.set(35, 45, 25);
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 2048;
+            sunLight.shadow.mapSize.height = 2048;
+            sunLight.shadow.camera.near = 0.5;
+            sunLight.shadow.camera.far = 160;
+            const d = 35;
+            sunLight.shadow.camera.left = -d;
+            sunLight.shadow.camera.right = d;
+            sunLight.shadow.camera.top = d;
+            sunLight.shadow.camera.bottom = -d;
+            scene.add(sunLight);
+
+            const hemiLight = new THREE.HemisphereLight(0x60a5fa, 0x1e293b, 0.45);
+            scene.add(hemiLight);
+
+            // --- MATERIALS ---
+            const materials = {
+                exteriorConcrete: new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.7 }), 
+                exteriorCedar: new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.5 }), 
+                roofMaterial: new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.3 }), 
+                teakDeck: new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.4 }), 
+                grass: new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.85 }), 
+
+                wallFoyer: new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.5 }), 
+                wallGarage: new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.8 }), 
+                wallGuest: new THREE.MeshStandardMaterial({ color: 0xc8c2bc, roughness: 0.5 }), 
+                wallLiving: new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 }), 
+                wallKitchen: new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.3 }), 
+                wallMaster: new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.5 }), 
+                wallBath: new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.1 }), 
+
+                glassExterior: new THREE.MeshPhysicalMaterial({ 
+                    color: 0x1e293b, 
+                    transparent: true, 
+                    opacity: 0.85, 
+                    roughness: 0.05, 
+                    transmission: 0.25, 
+                    ior: 1.52 
+                }),
+                glassInterior: new THREE.MeshPhysicalMaterial({ 
+                    color: 0x93c5fd, 
+                    transparent: true, 
+                    opacity: 0.35, 
+                    roughness: 0.1, 
+                    transmission: 0.8, 
+                    ior: 1.5 
+                }),
+
+                frameDark: new THREE.MeshStandardMaterial({ color: 0x090d14, roughness: 0.2 }), 
+                timber: new THREE.MeshStandardMaterial({ color: 0x582f0e, roughness: 0.4 }), 
+                leather: new THREE.MeshStandardMaterial({ color: 0x854d0e, roughness: 0.35 }), 
+                marble: new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.1 }), 
+                water: new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.1, transparent: true, opacity: 0.8 })
+            };
+
+            // --- HELPER BUILDERS WITH PROPER DOOR OPENINGS ---
+            
+            // Creates a solid wall segment with an opening for a door
+            function createWallWithDoor(x, y, z, wallWidth, height, depth, doorOffset, doorWidth, doorHeight, mat, isXAxis = true) {
+                const group = new THREE.Group();
+                const doorLeft = doorOffset - doorWidth / 2;
+                const doorRight = doorOffset + doorWidth / 2;
+                const halfW = wallWidth / 2;
+
+                if (isXAxis) {
+                    // Left piece
+                    const leftW = doorLeft - (-halfW);
+                    if (leftW > 0) {
+                        const leftMesh = new THREE.Mesh(new THREE.BoxGeometry(leftW, height, depth), mat);
+                        leftMesh.position.set(-halfW + leftW / 2, height / 2, 0);
+                        leftMesh.castShadow = true; leftMesh.receiveShadow = true;
+                        group.add(leftMesh);
+                    }
+                    // Right piece
+                    const rightW = halfW - doorRight;
+                    if (rightW > 0) {
+                        const rightMesh = new THREE.Mesh(new THREE.BoxGeometry(rightW, height, depth), mat);
+                        rightMesh.position.set(doorRight + rightW / 2, height / 2, 0);
+                        rightMesh.castShadow = true; rightMesh.receiveShadow = true;
+                        group.add(rightMesh);
+                    }
+                    // Lintel (Top above door)
+                    const lintelH = height - doorHeight;
+                    if (lintelH > 0) {
+                        const lintel = new THREE.Mesh(new THREE.BoxGeometry(doorWidth, lintelH, depth), mat);
+                        lintel.position.set(doorOffset, doorHeight + lintelH / 2, 0);
+                        lintel.castShadow = true; lintel.receiveShadow = true;
+                        group.add(lintel);
+                    }
+                } else { // Z Axis
+                    const leftW = doorLeft - (-halfW);
+                    if (leftW > 0) {
+                        const leftMesh = new THREE.Mesh(new THREE.BoxGeometry(depth, height, leftW), mat);
+                        leftMesh.position.set(0, height / 2, -halfW + leftW / 2);
+                        leftMesh.castShadow = true; leftMesh.receiveShadow = true;
+                        group.add(leftMesh);
+                    }
+                    const rightW = halfW - doorRight;
+                    if (rightW > 0) {
+                        const rightMesh = new THREE.Mesh(new THREE.BoxGeometry(depth, height, rightW), mat);
+                        rightMesh.position.set(0, height / 2, doorRight + rightW / 2);
+                        rightMesh.castShadow = true; rightMesh.receiveShadow = true;
+                        group.add(rightMesh);
+                    }
+                    const lintelH = height - doorHeight;
+                    if (lintelH > 0) {
+                        const lintel = new THREE.Mesh(new THREE.BoxGeometry(depth, lintelH, doorWidth), mat);
+                        lintel.position.set(0, doorHeight + lintelH / 2, doorOffset);
+                        lintel.castShadow = true; lintel.receiveShadow = true;
+                        group.add(lintel);
+                    }
+                }
+
+                group.position.set(x, y, z);
+                scene.add(group);
+            }
+
+            function createSolidWall(x, y, z, w, h, d, mat) {
+                const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+                mesh.position.set(x, y + h / 2, z);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                scene.add(mesh);
+                return mesh;
+            }
+
+            function createFurniture(x, y, z, w, h, d, mat) {
+                const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+                mesh.position.set(x, y + h / 2, z);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                scene.add(mesh);
+            }
+
+            function createWindowWall(x, y, z, w, h, mat = materials.glassExterior, isXAxis = true) {
+                const mesh = new THREE.Mesh(
+                    isXAxis ? new THREE.BoxGeometry(w, h, 0.1) : new THREE.BoxGeometry(0.1, h, w), 
+                    mat
+                );
+                mesh.position.set(x, y + h / 2, z);
+                scene.add(mesh);
+            }
+
+            // --- TERRAIN & SITE ---
+            const lawn = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), materials.grass);
+            lawn.rotation.x = -Math.PI / 2;
+            lawn.receiveShadow = true;
+            scene.add(lawn);
+
+            const driveway = new THREE.Mesh(new THREE.PlaneGeometry(16, 25), materials.exteriorConcrete);
+            driveway.rotation.x = -Math.PI / 2;
+            driveway.position.set(-8, 0.02, 16);
+            driveway.receiveShadow = true;
+            scene.add(driveway);
+
+            // --- BUILD HOUSE STRUCTURE ---
+
+            // LEVEL 01 GROUND FLOOR (Y: 0 to 4)
+            createSolidWall(0, 0, 0, 26, 0.2, 14, materials.exteriorConcrete); // Foundation Slab
+            
+            // Exterior Front Facade Wall with Main Entry Door Opening
+            createWallWithDoor(0, 0, 6, 26, 4, 0.4, 0, 2.6, 3.2, materials.exteriorCedar, true);
+            // Exterior Walls
+            createSolidWall(-13, 0, 0, 0.4, 4, 12, materials.exteriorCedar); // West
+            createSolidWall(13, 0, 0, 0.4, 4, 12, materials.exteriorCedar);  // East
+            createSolidWall(0, 0, -6, 26, 4, 0.4, materials.exteriorConcrete); // Rear
+
+            // Interior Dividers with Door Openings
+            createWallWithDoor(-4, 0, 0, 12, 4, 0.2, 2, 2.2, 3.0, materials.wallGarage, false); // Garage Door
+            createWallWithDoor(4, 0, 0, 12, 4, 0.2, 2, 2.2, 3.0, materials.wallGuest, false);  // Guest Door
+
+            // Ground Floor Furniture
+            createFurniture(-8, 0, 0, 4.2, 1.4, 6.8, new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+            createFurniture(0, 0, -3, 3, 0.8, 1.2, materials.timber);
+            createFurniture(8, 0, -3, 3.8, 1.2, 4, materials.wallGuest);
+
+
+            // LEVEL 02 MAIN LIVING (Y: 4 to 8)
+            // Ceiling / Floor Slab with Cutout for Stairwell (x: 0, z: -4)
+            createSolidWall(-6, 4, 0, 14, 0.2, 14, materials.exteriorConcrete);
+            createSolidWall(6, 4, 0, 14, 0.2, 14, materials.exteriorConcrete);
+
+            // L2 Exterior Walls & Windows
+            createWindowWall(0, 4, 7, 26, 3.8, materials.glassExterior, true); // Front Glass Curtain
+            createSolidWall(-13, 4, 0, 0.4, 4, 14, materials.exteriorConcrete); // West Wall
+            createSolidWall(0, 4, -7, 26, 4, 0.4, materials.exteriorCedar); // Rear Wall
+            
+            // Interior Divider between Living & Kitchen (with framed opening)
+            createWallWithDoor(-3, 4, 0, 14, 4, 0.2, 1, 3.2, 3.4, materials.wallKitchen, false);
+
+            // Cantilever Deck & Sliding Terrace Glass Door
+            createSolidWall(10, 4, 0, 8, 0.3, 14, materials.teakDeck);
+            createWallWithDoor(6, 4, 0, 14, 4, 0.3, 0, 3.2, 3.4, materials.exteriorConcrete, false); // Deck Door Frame
+
+            // L2 Furniture
+            createFurniture(-8, 4, 0, 4.8, 1.2, 3.2, materials.leather);
+            createFurniture(2, 4, 0, 2.2, 1.8, 6.5, materials.marble);
+
+
+            // LEVEL 03 MASTER SUITE & SKYDECK (Y: 8 to 12)
+            createSolidWall(-6, 8, 0, 14, 0.2, 14, materials.exteriorConcrete);
+            createSolidWall(6, 8, 0, 14, 0.2, 14, materials.exteriorConcrete);
+
+            // L3 Walls
+            createSolidWall(-11, 8, 0, 0.4, 4, 12, materials.exteriorConcrete); // West
+            createSolidWall(-4, 8, -6, 14, 4, 0.4, materials.exteriorCedar); // Rear
+            createWindowWall(-7, 8, 6, 8, 3.8, materials.glassExterior, true); // Front Window
+
+            // L3 Doors
+            createWallWithDoor(-3, 8, 0, 12, 4, 0.2, 3, 2.2, 3.0, materials.wallMaster, false); // Master Bedroom Door
+            createWallWithDoor(2, 8, 0, 12, 4, 0.2, -1, 2.0, 3.0, materials.wallBath, false);  // Ensuite Door
+            createWallWithDoor(2, 8, 3, 12, 4, 0.2, 3, 2.2, 3.0, materials.frameDark, false);   // Rooftop Deck Door
+
+            // L3 Furniture & Skydeck Pool
+            createFurniture(-7, 8, -2, 4.2, 1.4, 4.5, materials.wallMaster);
+            createFurniture(-0.2, 8, -3, 2.2, 1.2, 3.5, materials.marble);
+            
+            // Rooftop Pool Deck & Water
+            createSolidWall(7, 8, 0, 8, 0.3, 12, materials.teakDeck);
+            createFurniture(7, 8, 0, 5, 1.2, 8, materials.water);
+
+
+            // ROOF ARCHITECTURE COVERING (ROOF TOPS)
+            createSolidWall(-5, 12, 0, 14, 0.4, 13, materials.roofMaterial); // Main Roof Over Master
+            createSolidWall(7, 12, -4, 8, 0.3, 5, materials.roofMaterial);  // Over Stairwell Core
+
+
+            // HELICAL SPIRAL STAIRCASE (X: 0, Z: -4, Y: 0 to 12)
+            const stairSteps = 36;
+            for (let i = 0; i < stairSteps; i++) {
+                const angle = i * 0.38;
+                const radius = 1.8;
+                const sx = Math.cos(angle) * radius;
+                const sz = -4 + Math.sin(angle) * radius;
+                const sy = i * 0.33;
+
+                const stepMesh = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.12, 0.45), materials.timber);
+                stepMesh.position.set(sx, sy, sz);
+                stepMesh.rotation.y = -angle;
+                stepMesh.castShadow = true; stepMesh.receiveShadow = true;
+                scene.add(stepMesh);
+            }
+            const stairColumn = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 12, 16), materials.frameDark);
+            stairColumn.position.set(0, 6, -4);
+            scene.add(stairColumn);
+
+
+            // --- DRONE CAMERA WAYPOINTS (PASSTHROUGH DOORS & STAIRS ONLY) ---
+            const waypoints = [
+                // 1. Exterior Approach
+                { pos: new THREE.Vector3(0, 3.5, 22), look: new THREE.Vector3(0, 3, 6), label: "EXTERIOR FACADE" },
+                // 2. Through Front Entry Door (x: 0, y: 1.8, z: 6)
+                { pos: new THREE.Vector3(0, 1.8, 7.5), look: new THREE.Vector3(0, 1.8, 0), label: "MAIN ENTRY THRESHOLD" },
+                { pos: new THREE.Vector3(0, 1.8, 2), look: new THREE.Vector3(-4, 1.8, 2), label: "ENTRANCE FOYER" },
+                // 3. Through Garage Door (x: -4, y: 1.8, z: 2)
+                { pos: new THREE.Vector3(-3.8, 1.8, 2), look: new THREE.Vector3(-8, 1.8, 2), label: "GARAGE THRESHOLD" },
+                { pos: new THREE.Vector3(-8, 1.8, 0), look: new THREE.Vector3(0, 1.8, 2), label: "EXECUTIVE GARAGE" },
+                // 4. Back Through Garage Door, Across Foyer, Through Guest Door (x: 4, y: 1.8, z: 2)
+                { pos: new THREE.Vector3(-3.8, 1.8, 2), look: new THREE.Vector3(0, 1.8, 2), label: "FOYER TRANSIT" },
+                { pos: new THREE.Vector3(0, 1.8, 2), look: new THREE.Vector3(4, 1.8, 2), label: "FOYER HALLWAY" },
+                { pos: new THREE.Vector3(3.8, 1.8, 2), look: new THREE.Vector3(8, 1.8, 2), label: "GUEST SUITE THRESHOLD" },
+                { pos: new THREE.Vector3(8, 1.8, 0), look: new THREE.Vector3(0, 1.8, -4), label: "GUEST SUITE" },
+                // 5. Walk to Stairwell Core (x: 0, z: -4)
+                { pos: new THREE.Vector3(0, 1.8, -1), look: new THREE.Vector3(0, 1.8, -4), label: "STAIRWELL APPROACH" },
+                // 6. SPIRAL UP STAIRCASE SHAFT FLIGHT 1
+                { pos: new THREE.Vector3(1.8, 2.6, -4), look: new THREE.Vector3(0, 3.2, -4), label: "SPIRAL STAIR L1" },
+                { pos: new THREE.Vector3(0, 3.8, -2.2), look: new THREE.Vector3(-1.8, 4.2, -4), label: "MID STAIRWELL LANDING" },
+                { pos: new THREE.Vector3(-1.8, 5.0, -4), look: new THREE.Vector3(0, 5.5, -4), label: "SPIRAL STAIR L2" },
+                { pos: new THREE.Vector3(0, 5.8, -1), look: new THREE.Vector3(-7, 5.8, 0), label: "LEVEL 2 LANDING" },
+                // 7. L2 Living & Kitchen (Pass through door archway x: -3, z: 1)
+                { pos: new THREE.Vector3(-7, 5.8, 0), look: new THREE.Vector3(-3, 5.8, 1), label: "GREAT ROOM GALLERY" },
+                { pos: new THREE.Vector3(-3, 5.8, 1), look: new THREE.Vector3(2.5, 5.8, 0), label: "KITCHEN ARCHWAY" },
+                { pos: new THREE.Vector3(2.5, 5.8, 0), look: new THREE.Vector3(6, 5.8, 0), label: "CULINARY SUITE" },
+                // 8. Pass through Terrace Door (x: 6, z: 0)
+                { pos: new THREE.Vector3(6, 5.8, 0), look: new THREE.Vector3(10, 5.8, 0), label: "TERRACE DOORWAY" },
+                { pos: new THREE.Vector3(10, 5.8, 0), look: new THREE.Vector3(0, 6, -4), label: "CANTILEVER TERRACE" },
+                // 9. Back to Stairwell Flight 2
+                { pos: new THREE.Vector3(6, 5.8, 0), look: new THREE.Vector3(0, 5.8, -1), label: "RETURN TO STAIRWELL" },
+                { pos: new THREE.Vector3(0, 5.8, -1), look: new THREE.Vector3(0, 7, -4), label: "UPPER STAIR APPROACH" },
+                { pos: new THREE.Vector3(1.8, 6.8, -4), look: new THREE.Vector3(0, 7.5, -4), label: "SPIRAL STAIR L2-L3" },
+                { pos: new THREE.Vector3(0, 8.5, -2.2), look: new THREE.Vector3(-1.8, 9.2, -4), label: "LEVEL 3 LANDING" },
+                // 10. L3 Master, Bathroom & Pool (Pass through Master door x: -3, z: 3; Bath door x: 2, z: -1; Deck door x: 2, z: 3)
+                { pos: new THREE.Vector3(-3, 9.8, 3), look: new THREE.Vector3(-7, 9.8, 0), label: "MASTER SUITE DOORWAY" },
+                { pos: new THREE.Vector3(-7, 9.8, 0), look: new THREE.Vector3(-3, 9.8, 0), label: "PRIMARY SANCTUARY" },
+                { pos: new THREE.Vector3(-3, 9.8, 0), look: new THREE.Vector3(2, 9.8, -1), label: "CORRIDOR TRANSIT" },
+                { pos: new THREE.Vector3(2, 9.8, -1), look: new THREE.Vector3(-0.2, 9.8, -3), label: "ENSUITE DOORWAY" },
+                { pos: new THREE.Vector3(-0.2, 9.8, -3), look: new THREE.Vector3(2, 9.8, 3), label: "SPA BATHROOM" },
+                { pos: new THREE.Vector3(2, 9.8, 3), look: new THREE.Vector3(7, 10.5, 0), label: "ROOFTOP DECK DOOR" },
+                { pos: new THREE.Vector3(7, 10.8, 0), look: new THREE.Vector3(0, 6, 0), label: "ROOFTOP POOL DECK" }
+            ];
+
+            const posArray = waypoints.map(w => w.pos);
+            const lookArray = waypoints.map(w => w.look);
+
+            const cameraCurve = new THREE.CatmullRomCurve3(posArray, false, 'catmullrom', 0.15);
+            const lookCurve = new THREE.CatmullRomCurve3(lookArray, false, 'catmullrom', 0.15);
+
+            const state = { progress: 0 };
+
+            function updateCamera(p) {
+                const camPos = cameraCurve.getPointAt(p);
+                const lookPos = lookCurve.getPointAt(p);
+
+                camera.position.copy(camPos);
+                camera.lookAt(lookPos);
+
+                const index = Math.min(Math.floor(p * waypoints.length), waypoints.length - 1);
+                const currentPoint = waypoints[index];
+                
+                document.getElementById('telemetry').innerText = `ZONE: ${currentPoint.label} | ALT: ${(camPos.y * 0.8).toFixed(1)}M`;
+                if (debugBar) debugBar.style.width = (p * 100) + "%";
+
+                renderer.render(scene, camera);
+            }
+
+            window.addEventListener("resize", () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                updateCamera(state.progress);
+                ScrollTrigger.refresh();
+            });
+
+            gsap.to(state, {
+                progress: 1,
+                ease: "none",
+                scrollTrigger: {
+                    trigger: "#scrollTrack",
+                    start: "top top",
+                    end: "bottom bottom",
+                    scrub: 0.1,
+                    onUpdate: (self) => {
+                        state.progress = self.progress;
+                        updateCamera(self.progress);
+                    }
+                }
+            });
+
+            const tl = gsap.timeline({
+                scrollTrigger: {
+                    trigger: "#scrollTrack",
+                    start: "top top",
+                    end: "bottom bottom",
+                    scrub: 0.5
+                }
+            });
+
+            for (let i = 1; i <= 12; i++) {
+                tl.to(`#layer-${i} .card`, { opacity: 1, y: 0, duration: 1 })
+                  .to(`#layer-${i} .card`, { opacity: 0, y: -20, duration: 1 }, "+=0.8");
+            }
+
+            updateCamera(0);
+
+            setTimeout(() => {
+                ScrollTrigger.refresh();
+            }, 200);
+        });
+    </script>
+</body>
+</html>
