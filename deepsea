@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Echoes of the Deep: The Bathypelagic Descent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0284c7; /* Epipelagic initial color */
+            overflow-x: hidden;
+            font-family: 'Courier New', Courier, monospace;
+            cursor: crosshair;
+            user-select: none;
+            transition: background-color 0.4s ease;
+        }
+
+        #scroll-container {
+            height: 30000px;
+        }
+
+        /* Submarine Floodlight Beam Overlay (Always Visible, Intensifies in Deep Water) */
+        #floodlight-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 15;
+            opacity: 0.15;
+            transition: opacity 0.6s ease;
+            background: 
+                radial-gradient(ellipse 70% 50% at 50% 0%, rgba(56, 189, 248, 0.3) 0%, rgba(15, 23, 42, 0) 80%),
+                radial-gradient(circle 240px at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(45, 212, 191, 0.25) 0%, rgba(0, 0, 0, 0.4) 60%, rgba(0, 0, 0, 0.75) 100%);
+        }
+
+        /* Submarine Viewport Inner Edge Frame & Ambient Glow */
+        #viewport-frame {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 25;
+            box-shadow: inset 0 0 100px rgba(15, 118, 110, 0.3), inset 0 0 30px rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(45, 212, 191, 0.15);
+        }
+
+        /* Canvas Layers */
+        #sonar-canvas, #env-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+        }
+        #env-canvas { z-index: 5; }
+        #sonar-canvas { z-index: 10; }
+
+        /* UI Glitch & Flicker Effects */
+        .pressure-glitch {
+            animation: glitch 0.2s infinite;
+        }
+
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); filter: hue-rotate(90deg); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+
+        .flicker {
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 0.9; }
+        }
+
+        /* Narrative Cards Styling */
+        .discovery-node {
+            transition: opacity 0.4s ease, transform 0.4s ease;
+            opacity: 0;
+            transform: translateY(15px);
+        }
+
+        .discovery-node.revealed {
+            opacity: 1 !important;
+            transform: translateY(0) !important;
+        }
+    </style>
+</head>
+<body class="text-slate-100">
+
+    <div id="scroll-container"></div>
+
+    <!-- Visual Overlays -->
+    <div id="floodlight-overlay"></div>
+    <div id="viewport-frame"></div>
+    <canvas id="env-canvas"></canvas>
+    <canvas id="sonar-canvas"></canvas>
+
+    <!-- Cockpit Telemetry HUD (Fixed) -->
+    <div id="hud" class="fixed top-0 left-0 w-full p-6 flex justify-between items-start pointer-events-none z-30 transition-all duration-300">
+        <!-- Telemetry Data -->
+        <div class="bg-slate-950/85 border border-teal-500/50 p-4 rounded-lg backdrop-blur-md shadow-xl shadow-teal-950/40">
+            <h1 class="text-xs uppercase tracking-widest text-teal-400 font-bold mb-1">DSV ARCHELON // TELEMETRY</h1>
+            <div class="text-2xl font-mono text-teal-200">
+                DEPTH: <span id="ui-depth" class="font-bold text-white">0</span> M
+            </div>
+            <div class="text-sm font-mono text-teal-400/90">
+                PRESSURE: <span id="ui-pressure">14.7</span> PSI
+            </div>
+            <div class="w-48 bg-slate-900 h-2 mt-3 rounded-full overflow-hidden border border-teal-800">
+                <div id="ui-bar" class="bg-teal-400 h-full w-0 transition-all duration-100"></div>
+            </div>
+            <div id="ui-zone" class="text-xs font-mono text-teal-300 mt-2 tracking-wider">ZONE: EPIPELAGIC (SUNLIGHT)</div>
+        </div>
+
+        <!-- Controls HUD -->
+        <div class="bg-slate-950/85 border border-teal-500/50 p-4 rounded-lg backdrop-blur-md text-right flex flex-col items-end gap-2 shadow-xl shadow-teal-950/40">
+            <div id="hull-status" class="text-xs text-teal-400 font-bold">HULL INTEGRITY: 100%</div>
+            <div id="speed-indicator" class="text-xs font-mono text-slate-400">DESCENT: CRUISE</div>
+            
+            <div class="flex gap-2 mt-1">
+                <button id="audio-toggle" class="pointer-events-auto text-xs bg-teal-950 hover:bg-teal-800 text-teal-300 border border-teal-600/60 px-3 py-1 rounded transition-all">
+                    ENABLE SONICS
+                </button>
+            </div>
+
+            <div class="border-t border-teal-900/60 pt-2 w-full flex flex-col items-end gap-1.5 mt-1">
+                <div class="text-[10px] uppercase font-mono tracking-widest text-teal-500">Navigation Systems</div>
+                <div class="flex gap-2">
+                    <button id="auto-speed" class="pointer-events-auto text-xs bg-slate-900 hover:bg-slate-800 text-teal-400 border border-teal-800 px-2 py-1 rounded font-mono">
+                        1x
+                    </button>
+                    <button id="auto-toggle" class="pointer-events-auto text-xs bg-slate-900 hover:bg-teal-950 text-teal-400 border border-teal-600/60 px-3 py-1 rounded font-mono tracking-wider transition-all">
+                        AUTOPILOT: OFF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Narrative Overlay Content -->
+    <div id="narrative-layer" class="fixed inset-0 pointer-events-none z-20 flex items-center justify-center p-8">
+        
+        <!-- Zone 1: Sunlight -->
+        <div id="content-sunlight" class="discovery-node max-w-xl text-center bg-sky-950/70 p-6 rounded-lg border border-sky-400/40 backdrop-blur-md shadow-2xl">
+            <span class="text-xs font-bold text-sky-300 tracking-widest uppercase">Depth Log 0-200m</span>
+            <h2 class="text-2xl font-bold text-white my-2">The Epipelagic Zone</h2>
+            <p class="text-sm text-sky-100 leading-relaxed">
+                Sunlight penetrates these upper waters, powering 90% of marine life through photosynthesis. Plankton populations flourish near the surface. All diagnostic systems active.
+            </p>
+        </div>
+
+        <!-- Zone 2: Twilight -->
+        <div id="content-twilight" class="discovery-node max-w-xl text-center bg-slate-950/80 p-6 rounded-lg border border-teal-500/50 backdrop-blur-md shadow-2xl hidden">
+            <span class="text-xs font-bold text-teal-400 tracking-widest uppercase">Depth Log 200-1,000m</span>
+            <h2 class="text-2xl font-bold text-teal-100 my-2">The Mesopelagic Zone</h2>
+            <p class="text-sm text-teal-200/90 leading-relaxed">
+                Sunlight degrades rapidly. Bioluminescent signatures detected: specialized organisms generate ventral photophores to blend with the dim skylight above, effectively cloaking themselves from below.
+            </p>
+        </div>
+
+        <!-- Zone 3: Midnight -->
+        <div id="content-midnight" class="discovery-node max-w-xl text-center bg-slate-950/90 p-6 rounded-lg border border-emerald-500/50 backdrop-blur-md shadow-2xl hidden">
+            <span class="text-xs font-bold text-emerald-400 tracking-widest uppercase">Sub-surface Discovery Log #402</span>
+            <h2 class="text-2xl font-bold text-emerald-100 my-2">Bathypelagic Anomalies</h2>
+            <p class="text-sm text-slate-300 leading-relaxed mb-3">
+                Submarine floodlights illumination active. High-power optical sensors locked onto deep target.
+            </p>
+            <div class="text-xs font-mono text-emerald-300/90 border-t border-emerald-900/60 pt-3 text-left space-y-1 bg-emerald-950/30 p-3 rounded">
+                <p>> SPECIES IDENTIFIED: Melanocetus johnsonii (Humpback Anglerfish)</p>
+                <p>> HYDROSTATIC TOLERANCE: 400 atmospheres</p>
+                <p>> OBSERVATION: Organism utilizes bioluminescent dorsal lures to attract prey. Maintain safe standoff distance.</p>
+            </div>
+        </div>
+
+        <!-- Zone 4: Hadal -->
+        <div id="content-hadal" class="discovery-node max-w-xl text-center bg-slate-950/95 p-6 rounded-lg border border-red-500/50 backdrop-blur-md shadow-2xl hidden">
+            <span class="text-xs font-bold text-red-400 tracking-widest uppercase">Recovered Telemetry // Dive 09</span>
+            <h2 class="text-xl font-bold text-red-100 my-2 font-mono">CHALLENGER DEEP FLIGHT RECORDER</h2>
+            <p class="text-xs text-red-200/90 italic leading-relaxed my-3 font-mono bg-red-950/30 p-3 rounded border border-red-900/40">
+                "...hull stress passing safety limits... visual sensors degraded... can you hear that hull groan? It's not just pressure out there. Something reacted to our active ping..."
+            </p>
+            <div class="text-xs font-mono text-red-400/80 text-right">
+                [TRANSCRIPT LOG CORRUPTED AT 10,911M]
+            </div>
+        </div>
+
+    </div>
+
+    <div id="instruction" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-950/85 border border-teal-500/40 px-6 py-2 rounded-full text-xs font-mono text-teal-300 z-30 pointer-events-none transition-opacity duration-500 shadow-lg">
+        SCROLL TO DESCEND | CLICK TO EMIT SONAR PING
+    </div>
+
+    <script>
+        const MAX_DEPTH = 11000;
+        let currentDepth = 0;
+        let lastScrollTop = 0;
+        let scrollSpeed = 0;
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+        let audioEnabled = false;
+
+        // Autopilot State
+        let autoScrollActive = false;
+        let autoScrollSpeed = 2.5;
+        let speedMultiplierIndex = 0;
+        const speedMultipliers = [1, 2.5, 6];
+        const speedLabels = ['1x', '2x', '4x'];
+        let animationFrameId = null;
+
+        // DOM Elements
+        const uiDepth = document.getElementById('ui-depth');
+        const uiPressure = document.getElementById('ui-pressure');
+        const uiBar = document.getElementById('ui-bar');
+        const uiZone = document.getElementById('ui-zone');
+        const hud = document.getElementById('hud');
+        const hullStatus = document.getElementById('hull-status');
+        const speedIndicator = document.getElementById('speed-indicator');
+        const floodlight = document.getElementById('floodlight-overlay');
+        const instruction = document.getElementById('instruction');
+        const autoToggleBtn = document.getElementById('auto-toggle');
+        const autoSpeedBtn = document.getElementById('auto-speed');
+
+        const nodes = {
+            sunlight: document.getElementById('content-sunlight'),
+            twilight: document.getElementById('content-twilight'),
+            midnight: document.getElementById('content-midnight'),
+            hadal: document.getElementById('content-hadal')
+        };
+
+        // --- AUDIO SYNTHESIZER ---
+        let audioCtx, ambientGain, humOsc;
+
+        function initAudio() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+            const bufferSize = audioCtx.sampleRate * 2;
+            const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            let lastOut = 0.0;
+            for (let i = 0; i < bufferSize; i++) {
+                const white = Math.random() * 2 - 1;
+                output[i] = (lastOut + (0.02 * white)) / 1.02;
+                lastOut = output[i];
+                output[i] *= 3.5;
+            }
+
+            const ambientSource = audioCtx.createBufferSource();
+            ambientSource.buffer = noiseBuffer;
+            ambientSource.loop = true;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 450;
+
+            ambientGain = audioCtx.createGain();
+            ambientGain.gain.value = 0.15;
+
+            ambientSource.connect(filter);
+            filter.connect(ambientGain);
+            ambientGain.connect(audioCtx.destination);
+            ambientSource.start();
+
+            humOsc = audioCtx.createOscillator();
+            humOsc.type = 'sine';
+            humOsc.frequency.value = 55;
+            const humGain = audioCtx.createGain();
+            humGain.gain.value = 0.05;
+            humOsc.connect(humGain);
+            humGain.connect(audioCtx.destination);
+            humOsc.start();
+        }
+
+        function triggerSonarSound() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.8);
+
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.8);
+        }
+
+        function triggerCreakSound() {
+            if (!audioCtx || currentDepth < 4000) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            
+            const freq = 80 + Math.random() * 60;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(freq - 20, audioCtx.currentTime + 0.3);
+
+            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 300;
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.3);
+        }
+
+        function triggerAutopilotTone(enable) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            const startFreq = enable ? 300 : 600;
+            const endFreq = enable ? 600 : 300;
+            
+            osc.frequency.setValueAtTime(startFreq, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(endFreq, audioCtx.currentTime + 0.15);
+
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.15);
+        }
+
+        document.getElementById('audio-toggle').addEventListener('click', (e) => {
+            initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            audioEnabled = true;
+            e.target.innerText = "SONICS ONLINE";
+            e.target.classList.replace('bg-teal-950', 'bg-teal-600');
+            e.target.classList.replace('text-teal-300', 'text-white');
+        });
+
+        // --- AUTOPILOT ---
+        function stepAutoScroll() {
+            if (!autoScrollActive) return;
+
+            const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+            if (window.scrollY < maxScroll) {
+                window.scrollBy(0, autoScrollSpeed);
+                animationFrameId = requestAnimationFrame(stepAutoScroll);
+            } else {
+                toggleAutopilot(false);
+            }
+        }
+
+        function toggleAutopilot(forceState = null) {
+            autoScrollActive = forceState !== null ? forceState : !autoScrollActive;
+
+            if (autoScrollActive) {
+                autoToggleBtn.innerText = "AUTOPILOT: ON";
+                autoToggleBtn.classList.replace('bg-slate-900', 'bg-teal-500');
+                autoToggleBtn.classList.replace('text-teal-400', 'text-slate-950');
+                autoToggleBtn.classList.add('font-bold');
+                if (audioEnabled) triggerAutopilotTone(true);
+                stepAutoScroll();
+            } else {
+                autoToggleBtn.innerText = "AUTOPILOT: OFF";
+                autoToggleBtn.classList.replace('bg-teal-500', 'bg-slate-900');
+                autoToggleBtn.classList.replace('text-slate-950', 'text-teal-400');
+                autoToggleBtn.classList.remove('font-bold');
+                if (audioEnabled) triggerAutopilotTone(false);
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            }
+        }
+
+        autoToggleBtn.addEventListener('click', () => toggleAutopilot());
+
+        autoSpeedBtn.addEventListener('click', () => {
+            speedMultiplierIndex = (speedMultiplierIndex + 1) % speedMultipliers.length;
+            autoScrollSpeed = speedMultipliers[speedMultiplierIndex] * 2.5;
+            autoSpeedBtn.innerText = speedLabels[speedMultiplierIndex];
+        });
+
+        window.addEventListener('wheel', () => { if (autoScrollActive) toggleAutopilot(false); }, { passive: true });
+        window.addEventListener('touchstart', () => { if (autoScrollActive) toggleAutopilot(false); }, { passive: true });
+
+        // --- CANVAS PARTICLES & SONAR ---
+        const envCanvas = document.getElementById('env-canvas');
+        const envCtx = envCanvas.getContext('2d');
+        const sonarCanvas = document.getElementById('sonar-canvas');
+        const sonarCtx = sonarCanvas.getContext('2d');
+
+        function resizeCanvases() {
+            envCanvas.width = sonarCanvas.width = window.innerWidth;
+            envCanvas.height = sonarCanvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvases);
+        resizeCanvases();
+
+        const particles = Array.from({ length: 140 }, () => ({
+            x: Math.random() * window.innerWidth,
+            y: Math.random() * window.innerHeight,
+            size: Math.random() * 2.5 + 0.8,
+            speedY: Math.random() * 0.5 + 0.1,
+            bio: Math.random() > 0.5,
+            pulse: Math.random() * Math.PI
+        }));
+
+        function drawParticles() {
+            envCtx.clearRect(0, 0, envCanvas.width, envCanvas.height);
+            particles.forEach(p => {
+                p.y -= p.speedY + (scrollSpeed * 0.1);
+                if (p.y < 0) p.y = envCanvas.height;
+                if (p.y > envCanvas.height) p.y = 0;
+
+                envCtx.beginPath();
+                envCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+
+                if (p.bio && currentDepth > 200) {
+                    p.pulse += 0.03;
+                    const glow = (Math.sin(p.pulse) + 1) / 2;
+                    envCtx.fillStyle = `rgba(45, 212, 191, ${0.4 + glow * 0.6})`;
+                    envCtx.shadowBlur = 10;
+                    envCtx.shadowColor = '#2dd4bf';
+                } else {
+                    const alpha = Math.max(0.3, Math.min(0.8, currentDepth / 1000));
+                    envCtx.fillStyle = `rgba(224, 242, 254, ${alpha})`;
+                    envCtx.shadowBlur = 0;
+                }
+                envCtx.fill();
+            });
+            requestAnimationFrame(drawParticles);
+        }
+        drawParticles();
+
+        let pings = [];
+        window.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') return;
+            pings.push({ x: e.clientX, y: e.clientY, radius: 10, alpha: 1 });
+            if (audioEnabled) triggerSonarSound();
+        });
+
+        function drawSonar() {
+            sonarCtx.clearRect(0, 0, sonarCanvas.width, sonarCanvas.height);
+            pings.forEach((ping, index) => {
+                ping.radius += 6;
+                ping.alpha -= 0.015;
+
+                if (ping.alpha <= 0) {
+                    pings.splice(index, 1);
+                } else {
+                    sonarCtx.beginPath();
+                    sonarCtx.arc(ping.x, ping.y, ping.radius, 0, Math.PI * 2);
+                    sonarCtx.strokeStyle = `rgba(45, 212, 191, ${ping.alpha})`;
+                    sonarCtx.lineWidth = 2;
+                    sonarCtx.stroke();
+                }
+            });
+            requestAnimationFrame(drawSonar);
+        }
+        drawSonar();
+
+        // Mouse Motion
+        window.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            document.documentElement.style.setProperty('--mouse-x', `${mouseX}px`);
+            document.documentElement.style.setProperty('--mouse-y', `${mouseY}px`);
+        });
+
+        // --- SCROLL & ENVIRONMENTAL ENGINE ---
+        window.addEventListener('scroll', () => {
+            const scrollTop = window.scrollY;
+            const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+            const scrollPercent = Math.min(1, Math.max(0, scrollTop / maxScroll));
+            
+            scrollSpeed = Math.abs(scrollTop - lastScrollTop);
+            lastScrollTop = scrollTop;
+
+            currentDepth = Math.round(scrollPercent * MAX_DEPTH);
+            const psi = (14.7 + (currentDepth * 1.42)).toFixed(1);
+
+            uiDepth.innerText = currentDepth.toLocaleString();
+            uiPressure.innerText = parseFloat(psi).toLocaleString();
+            uiBar.style.width = `${scrollPercent * 100}%`;
+
+            if (scrollTop > 50) instruction.style.opacity = '0';
+
+            if (scrollSpeed > 40) {
+                speedIndicator.innerText = "DESCENT: RAPID";
+                speedIndicator.classList.add("text-amber-400");
+                if (currentDepth > 1000) floodlight.classList.add("flicker");
+            } else {
+                speedIndicator.innerText = "DESCENT: CRUISE";
+                speedIndicator.classList.remove("text-amber-400");
+                floodlight.classList.remove("flicker");
+            }
+
+            updateEnvironmentalZones(scrollPercent);
+
+            if (Math.random() < 0.05 && audioEnabled) {
+                triggerCreakSound();
+            }
+        });
+
+        function updateEnvironmentalZones(progress) {
+            // Zone 1: Epipelagic (0m - 200m)
+            if (currentDepth < 200) {
+                const ratio = currentDepth / 200;
+                document.body.style.backgroundColor = interpolateColor('#0284c7', '#0f172a', ratio);
+                uiZone.innerText = "ZONE: EPIPELAGIC (SUNLIGHT)";
+                floodlight.style.opacity = "0.2";
+
+                showNode(nodes.sunlight);
+                hideNode(nodes.twilight);
+                hideNode(nodes.midnight);
+                hideNode(nodes.hadal);
+            }
+            // Zone 2: Mesopelagic (200m - 1000m)
+            else if (currentDepth >= 200 && currentDepth < 1000) {
+                const ratio = (currentDepth - 200) / 800;
+                document.body.style.backgroundColor = interpolateColor('#0f172a', '#030712', ratio);
+                uiZone.innerText = "ZONE: MESOPELAGIC (TWILIGHT)";
+                floodlight.style.opacity = (0.2 + ratio * 0.4).toString();
+
+                hideNode(nodes.sunlight);
+                showNode(nodes.twilight);
+                hideNode(nodes.midnight);
+                hideNode(nodes.hadal);
+            }
+            // Zone 3: Bathypelagic (1000m - 4000m)
+            else if (currentDepth >= 1000 && currentDepth < 4000) {
+                // Dim dark navy instead of pitch black
+                document.body.style.backgroundColor = '#030712';
+                uiZone.innerText = "ZONE: BATHYPELAGIC (MIDNIGHT)";
+                floodlight.style.opacity = "0.7";
+
+                hideNode(nodes.sunlight);
+                hideNode(nodes.twilight);
+                showNode(nodes.midnight);
+                hideNode(nodes.hadal);
+            }
+            // Zone 4: Hadal (4000m - 11000m)
+            else if (currentDepth >= 4000) {
+                document.body.style.backgroundColor = '#020617';
+                uiZone.innerText = "ZONE: HADAL (ABYSSAL TRENCH)";
+                floodlight.style.opacity = "0.85";
+
+                hideNode(nodes.sunlight);
+                hideNode(nodes.twilight);
+                hideNode(nodes.midnight);
+                showNode(nodes.hadal);
+
+                if (currentDepth > 8000) {
+                    hud.classList.add('pressure-glitch');
+                    hullStatus.innerText = "HULL INTEGRITY: CRITICAL";
+                    hullStatus.classList.add('text-red-500');
+                } else {
+                    hud.classList.remove('pressure-glitch');
+                    hullStatus.innerText = "HULL INTEGRITY: WARNING";
+                    hullStatus.classList.replace('text-teal-400', 'text-amber-500');
+                }
+            }
+        }
+
+        // Helpers
+        function showNode(el) {
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('revealed'), 20);
+        }
+
+        function hideNode(el) {
+            el.classList.remove('revealed');
+            el.classList.add('hidden');
+        }
+
+        function interpolateColor(color1, color2, factor) {
+            let c1 = hexToRgb(color1);
+            let c2 = hexToRgb(color2);
+            let r = Math.round(c1.r + factor * (c2.r - c1.r));
+            let g = Math.round(c1.g + factor * (c2.g - c1.g));
+            let b = Math.round(c1.b + factor * (c2.b - c1.b));
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        function hexToRgb(hex) {
+            let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : { r: 0, g: 0, b: 0 };
+        }
+
+        nodes.sunlight.classList.add('revealed');
+    </script>
+</body>
+</html>
